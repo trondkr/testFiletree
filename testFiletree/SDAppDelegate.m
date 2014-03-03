@@ -37,10 +37,6 @@
         NSArray *metadataArray=[NSArray arrayWithObjects:NSURLIsHiddenKey,
                                 NSURLNameKey,
                                 NSURLIsDirectoryKey,
-                                NSURLContentModificationDateKey,
-                                NSURLCreationDateKey,
-                                NSURLEffectiveIconKey,
-                                NSURLFileSizeKey,
                                 nil];
         
         NSDirectoryEnumerator *enumL = [fm enumeratorAtURL:[NSURL URLWithString:@"/Users/trondkr/test/Sites1"]
@@ -54,8 +50,8 @@
         
         
         for (NSURL *url in enumL){
-            NSString *myurl=[NSString stringWithFormat:@"%@",[url.path stringByReplacingOccurrencesOfString:self.rootdirL.path withString:@""]];
-            [self.arrayDirL addObject:myurl];
+            // add the url to the directory as it caches the metadata fetched in includingPropertiesForKeys:
+            [self.arrayDirL addObject:url];
         }
     }
     
@@ -65,22 +61,28 @@
     // Create a tree structure of the files and directories so that
     // we have a dictionary with all the parents and children
     
-    @autoreleasepool {
-        NSFileManager *fm = [NSFileManager defaultManager];
+    // do this enumeration concurrent on as many threads as GCD thinks is useful
+    [self.arrayDirL enumerateObjectsWithOptions:NSEnumerationConcurrent 
+                                     usingBlock:^(NSURL*url, NSUInteger index, BOOL *stop)
+     {
         BOOL isDir=NO;
-        NSString *local;
         NSString *myKey;
-        
-        for (NSString *url in self.arrayDirL) {
-            
-            myKey = [url stringByDeletingLastPathComponent];
-            local = [self.rootdirL.path stringByAppendingString:url];
-            [fm fileExistsAtPath:local isDirectory:&isDir];
-          
-            if (!isDir)
-                [self updateStructureWithKey:myKey andURL:url isDir:isDir];
-        }
-    }
+        myKey = [[url URLByDeletingLastPathComponent] path];
+        NSNumber *isDirectory = nil;
+        NSError *erroer = nil;
+        BOOL success = [url getResourceValue:&isDirectory forKey:NSURLIsDirectoryKey error:&erroer];
+         if (! success) {
+             NSLog(@"couldn't fetch NSURLIsDirectoryKey for url: %@", [url description]);
+         }
+         isDir = [isDirectory boolValue];
+         if (!isDir) {
+             [self updateStructureWithKey:myKey andURL:url.path isDir:NO];
+         } else {
+             // strangely the existing code did this for all entries, making some of the "addDictionaryItem" several times. 
+             // i didn't quite get the requirements, do you want to have the directory in the dict or not? if no, why then have a key isdir? you could probybly call here addDictionaryItem: 
+             [self updateStructureWithKey:myKey andURL:url.path isDir:YES];
+         }
+    }];
 }
 
 -(void) updateStructureWithKey:(NSString*)myKey andURL:(NSString*)url isDir:(BOOL)isDir
@@ -97,35 +99,35 @@
         if ((unsigned long)counter<(unsigned long)components.count){
             NSString *addchild = [createDir stringByAppendingPathComponent:[components objectAtIndex:(unsigned long)counter]];
             
-            [self addDictionaryItem:createDir withURL:addchild isDir:TRUE];
+            [self addDictionaryItem:createDir withURL:addchild isDir:isDir];
         }
     }
+    // could call this probably directly in the outer loop, see comment above
     [self addDictionaryItem:myKey withURL:url isDir:isDir];
 }
 
 
 -(void) addDictionaryItem:(NSString *) mykey withURL:(NSString *)myurl isDir:(BOOL) myIsDir
 {
-    
-    if ([self.dict objectForKey:mykey] !=nil) {
-        
-        NSMutableArray *myarray = [[self.dict objectForKey:mykey] objectForKey:@"myarray"];
-        NSMutableArray *myarrayIsDir = [[self.dict objectForKey:mykey] objectForKey:@"isdir"];
-        
-        NSMutableDictionary *attrDict = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                         myarray, @"myarray", myarrayIsDir, @"isdir",
-                                         nil];
-        
-        if (![myarray containsObject:myurl]){
-            [myarray addObject:myurl];
-            [myarrayIsDir addObject:[NSNumber numberWithBool:myIsDir]];
-            
-            
-            [self.dict setObject:attrDict forKey:mykey];
-            
-        }
+    NSDictionary *mydict = nil;
+    // this is the lock that is the easiest to use. 
+    // this synchronizes reading and writing of the mutable self.dict
+    @synchronized(@"concurrentDictAccess") {
+        mydict = [self.dict objectForKey:mykey];
     }
-    else if ([self.dict objectForKey:mykey] ==nil) {
+    if ( mydict !=nil) {
+        
+        @synchronized(mydict) {
+            NSMutableArray *myarray = [mydict objectForKey:@"myarray"];
+            NSMutableArray *myarrayIsDir = [mydict objectForKey:@"isdir"];
+        
+        
+            if (![myarray containsObject:myurl]){
+                [myarray addObject:myurl];
+                [myarrayIsDir addObject:[NSNumber numberWithBool:myIsDir]];
+            }
+        }
+    } else {
         
         NSMutableArray *arrayOfFiles = [NSMutableArray array];
         [arrayOfFiles addObject:myurl];
@@ -136,8 +138,9 @@
         NSMutableDictionary *attrDict = [NSMutableDictionary dictionaryWithObjectsAndKeys:
                                          arrayOfFiles, @"myarray", arrayIsDir, @"isdir",
                                          nil];
-        
-        [self.dict setObject:attrDict forKey:mykey];
+        @synchronized(@"concurrentDictAccess") {
+            [self.dict setObject:attrDict forKey:mykey];
+        }
     }
 }
 

@@ -32,7 +32,7 @@
     
     NSLog(@"The resulting dictionary finished in: took: %f", [start timeIntervalSinceNow] * (-1.0));
     NSLog(@"Total files: L - %lu R - %lu",(unsigned long)self.arrayDirL.count,(unsigned long)self.arrayDirR.count);
-    NSLog(@"my dict: %@",self.dict);
+  //  NSLog(@"my dict: %@",self.dict);
 }
 
 
@@ -168,8 +168,8 @@
          } else {
              // strangely the existing code did this for all entries, making some of the "addDictionaryItem" several times.
              // i didn't quite get the requirements, do you want to have the directory in the dict or not? if no, why then have a key isdir? you could probybly call here addDictionaryItem:
-             // [self addDictionaryItem:myKey withURL:url.path isDir:isDir];
-             [self updateStructureWithKey:myKey andURL:fullurlL.path isDir:YES andLR:@"LR"];
+             [self addDictionaryItem:myKey withURL:url isDir:isDir andLR:@"LR"];
+             //[self updateStructureWithKey:myKey andURL:fullurlL.path isDir:YES andLR:@"LR"];
          }
      }];
 }
@@ -199,8 +199,8 @@
          } else {
              // strangely the existing code did this for all entries, making some of the "addDictionaryItem" several times.
              // i didn't quite get the requirements, do you want to have the directory in the dict or not? if no, why then have a key isdir? you could probybly call here addDictionaryItem:
-             // [self addDictionaryItem:myKey withURL:url.path isDir:isDir];
-             [self updateStructureWithKey:myKey andURL:fullurl.path isDir:YES andLR:LR];
+             [self addDictionaryItem:myKey withURL:url isDir:isDir andLR:LR];
+             //[self updateStructureWithKey:myKey andURL:fullurl.path isDir:YES andLR:LR];
          }
      }];
 }

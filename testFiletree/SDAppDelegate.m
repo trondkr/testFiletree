@@ -32,7 +32,7 @@
     
     NSLog(@"The resulting dictionary finished in: took: %f", [start timeIntervalSinceNow] * (-1.0));
     NSLog(@"Total files: L - %lu R - %lu",(unsigned long)self.arrayDirL.count,(unsigned long)self.arrayDirR.count);
-  //  NSLog(@"my dict: %@",self.dict);
+ //   NSLog(@"my dict: %@",self.dict);
 }
 
 
@@ -42,8 +42,8 @@
     @autoreleasepool{
         
         
-        self.rootdirL=[NSURL URLWithString:@"/Users/trondkr/Projects/"];
-        self.rootdirR=[NSURL URLWithString:@"/Users/trond/Projects/"];
+        self.rootdirL=[NSURL URLWithString:@"/Users/trondkr/Projects"];
+        self.rootdirR=[NSURL URLWithString:@"/Users/trond/Documents"];
         
         self.arrayDirL  = [NSMutableArray array];
         self.arrayDirR  = [NSMutableArray array];
@@ -61,6 +61,7 @@
         
         NSArray *metadataArray=[NSArray arrayWithObjects:NSURLIsHiddenKey,
                                 NSURLNameKey,
+                                NSURLContentModificationDateKey,
                                 NSURLIsDirectoryKey,
                                 nil];
         
@@ -76,7 +77,8 @@
         
         for (NSURL *url in enumL){
             // add the url to the directory as it caches the metadata fetched in includingPropertiesForKeys:
-            [self.arrayDirL addObject:[url.path stringByReplacingOccurrencesOfString:self.rootdirL.path withString:@""]];
+            [self.arrayDirL addObject:[url.path stringByReplacingCharactersInRange:NSMakeRange(0,self.rootdirL.path.length) withString:@""]];
+            // [self.arrayDirL addObject:[url.path stringByReplacingOccurrencesOfString:self.rootdirL.path withString:@""]];
             [self.arrayURLL addObject:url];
         }
         
@@ -92,7 +94,8 @@
         
         for (NSURL *url in enumR){
             // add the url to the directory as it caches the metadata fetched in includingPropertiesForKeys:
-            [self.arrayDirR addObject:[url.path stringByReplacingOccurrencesOfString:self.rootdirR.path withString:@""]];
+           // [self.arrayDirR addObject:[url.path stringByReplacingOccurrencesOfString:self.rootdirR.path withString:@""]];
+            [self.arrayDirR addObject:[url.path stringByReplacingCharactersInRange:NSMakeRange(0,self.rootdirR.path.length) withString:@""]];
             [self.arrayURLR addObject:url];
         }
     }
@@ -195,7 +198,7 @@
          }
          isDir = [isDirectory boolValue];
          if (!isDir) {
-             [self updateStructureWithKey:myKey andURL:fullurl.path isDir:NO andLR:LR];
+             [self updateStructureWithKey:myKey andURL:url isDir:NO andLR:LR];
          } else {
              // strangely the existing code did this for all entries, making some of the "addDictionaryItem" several times.
              // i didn't quite get the requirements, do you want to have the directory in the dict or not? if no, why then have a key isdir? you could probybly call here addDictionaryItem:
